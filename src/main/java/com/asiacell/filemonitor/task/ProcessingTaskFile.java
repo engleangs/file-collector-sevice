@@ -22,7 +22,7 @@ public class ProcessingTaskFile implements Runnable {
 
     @Override
     public void run() {
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy/MM/dd");
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy/MM/dd/HH");
         String today = simpleDateFormat.format( new Date());
         File destFolder = new File( destPath +"/"+today);
         if( !destFolder.exists() ) {

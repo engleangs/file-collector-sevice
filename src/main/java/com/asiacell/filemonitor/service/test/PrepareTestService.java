@@ -1,4 +1,5 @@
 package com.asiacell.filemonitor.service.test;
+
 import com.asiacell.filemonitor.model.WorkerItem;
 import com.asiacell.filemonitor.service.util.UtilService;
 import com.google.gson.Gson;
@@ -10,11 +11,11 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class PrepareTestService {
@@ -31,10 +32,10 @@ public class PrepareTestService {
         else if ( "PH".equals(type)) {
             testItem.setPhoto( fileName);
         }
-        else if("FP".equals( fileName )) {
+        else if("FP".equals( type )) {
             testItem.setFingerprint( fileName);
         }
-        else if("SG".equals( fileName)) {
+        else if("SG".equals( type)) {
             testItem.setSignature( fileName);
         }
     }
@@ -63,8 +64,10 @@ public class PrepareTestService {
                 TestItem testItem = new TestItem();
                 testItem.setMsisdn( msisdn);
                 addData( testItem , type, fileName);
+                data.put( msisdn , testItem);
             }
             moveToDest( imgFile, fileName,msisdn, destPath);
+
         }
 
         return data;
@@ -74,11 +77,18 @@ public class PrepareTestService {
     public void  generateTest(Map<String,TestItem>data,String dataPath) throws IOException {
         for(String key : data.keySet()) {
             TestItem testItem = data.get( key);
-            List<String>file  = Arrays.asList( testItem.photo, testItem.doc1, testItem.doc2,testItem.fingerprint ,testItem.getSignature());
+            List<String>file  = Arrays.asList( testItem.photo, testItem.doc1, testItem.doc2,testItem.fingerprint ,testItem.signature);
             WorkerItem workerItem = new WorkerItem( testItem.msisdn , "",file,null);
             String json = gson.toJson( workerItem);
-            BufferedWriter writer = new BufferedWriter(new FileWriter(dataPath+"/"+testItem.msisdn+".txt"));
-            writer.write( json);
+            try {
+                BufferedWriter writer = new BufferedWriter(new FileWriter(dataPath + "/" + testItem.msisdn + ".txt"));
+                writer.write(json);
+                writer.flush();
+                writer.close();
+
+            }catch (Exception ex){
+            ex.printStackTrace();
+            }
 
         }
     }

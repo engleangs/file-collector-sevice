@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.ArrayList;
@@ -31,16 +32,18 @@ public class FileShareFinalDirectoryServiceImpl implements FileShareFinalDirecto
     private String taskDirectory;
     private static final Logger LOGGER = LoggerFactory.getLogger( FileShareFinalDirectoryService.class);
     private Thread thread;
+    private Thread dbThread;
     private boolean running;
     private WatchService watchService;
     private Gson gson = new Gson();
     private static ConcurrentLinkedQueue<WorkerItem> DB_QUEUE = new ConcurrentLinkedQueue<>();
     private ThreadPoolExecutor threadPoolExecutor ;
-    private int MAX_QUEUE = 0;
+    private int MAX_QUEUE = 10;
     @Autowired
     private UtilService utilService;
     @Autowired
     private DataDaoService dataDaoService;
+    private long dbStartTime = System.currentTimeMillis();
 
 
     @Override
@@ -48,13 +51,42 @@ public class FileShareFinalDirectoryServiceImpl implements FileShareFinalDirecto
         LOGGER.info("start share final directory");
         watchService = FileSystems.getDefault().newWatchService();
         Path path = Paths.get( monitorDirectory);
+        loadOldFile();
         WatchKey watchKey = path.register(watchService, StandardWatchEventKinds.ENTRY_CREATE);
         LOGGER.info(watchKey.toString());
         running = true;
         thread = new Thread(this::run);
         thread.start();
         threadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(3);
+        dbThread = new Thread(this::dbRun);
+        dbThread.start();
 
+    }
+
+    private void loadOldFile()
+    {
+        File file = new File( monitorDirectory);
+        LOGGER.info("Begin to look for existing action file ...");
+        for(File actionFile : file.listFiles()) {
+            LOGGER.info(" loading old action file :"+actionFile.getName());
+            prepareCmd( actionFile.getName());
+        }
+    }
+
+    public void dbRun(){
+        while ( running ){
+            try {
+                long diff = System.currentTimeMillis() - dbStartTime;
+                if( DB_QUEUE.size() > MAX_QUEUE || (DB_QUEUE.size() > 0 && diff > 200)) {
+                    addToDb();
+                    dbStartTime = System.currentTimeMillis();
+                }
+                Thread.sleep(200);
+            }catch (Exception e){
+                LOGGER.error("dbRun error",e);
+            }
+
+        }
     }
 
 
@@ -77,6 +109,7 @@ public class FileShareFinalDirectoryServiceImpl implements FileShareFinalDirecto
 
     }
 
+
     private void addToDb(){
         List<ProcessItem>items = new ArrayList<>();
         List<WorkerItem>workerItems  = new ArrayList<>();
@@ -88,7 +121,6 @@ public class FileShareFinalDirectoryServiceImpl implements FileShareFinalDirecto
                 ProcessItem processingFileItem = new ProcessItem( utilService.guid(),hostname,   workerItem.getFolder(), workerItem.getMsisdn(),fileName,0 , new Date());
                 items.add( processingFileItem );
             }
-
         }
         dataDaoService.addBatchProcessItems(  items );
         for(WorkerItem fileWorker:workerItems) {
@@ -108,6 +140,9 @@ public class FileShareFinalDirectoryServiceImpl implements FileShareFinalDirecto
         }
         if( thread.isAlive()) {
             thread.interrupt();
+        }
+        if( dbThread.isAlive()) {
+            dbThread.interrupt();
         }
     }
 

@@ -3,11 +3,12 @@ package com.asiacell.filemonitor.service.data;
 import com.asiacell.filemonitor.model.FileMoveItem;
 import com.asiacell.filemonitor.model.ProcessItem;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
 public interface DataDaoService {
-    List<ProcessItem> getListItem();
+    List<ProcessItem> getListItem( Collection<String> itemId);
     int addBatchFileItems(List<FileMoveItem>fileMoveItems);
     int addBatchProcessItems(List<ProcessItem>processItems);
     int checkFileNotFoundDb(String hostname,ProcessItem processItem);

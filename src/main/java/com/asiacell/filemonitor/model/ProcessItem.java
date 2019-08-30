@@ -14,9 +14,13 @@ public class ProcessItem {
     private String tempPath;
     private String tempGuid;
     private String description;
+    private int retryTime  = 0;
+    private Date startMoveFileDate;
+    private Date expectedRunDate;
     public ProcessItem(){
 
     }
+
 
     public ProcessItem(String guid, String fromHostname, String folder, String misisdn, String fileName, int status, Date addDate) {
 
@@ -115,5 +119,28 @@ public class ProcessItem {
 
     public String getDescription() {
         return description;
+    }
+
+    public int getRetryTime() {
+        return retryTime;
+    }
+    public void retry(){
+        this.retryTime++;
+    }
+
+    public Date getStartMoveFileDate() {
+        return startMoveFileDate;
+    }
+
+    public void setStartMoveFileDate(Date startMoveFileDate) {
+        this.startMoveFileDate = startMoveFileDate;
+    }
+
+    public Date getExpectedRunDate() {
+        return expectedRunDate;
+    }
+
+    public void setExpectedRunDate(Date expectedRunDate) {
+        this.expectedRunDate = expectedRunDate;
     }
 }

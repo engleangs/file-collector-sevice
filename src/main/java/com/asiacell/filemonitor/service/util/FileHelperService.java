@@ -6,7 +6,7 @@ public interface FileHelperService {
     boolean moveTobyDate(String fileName, Path source, Path dest);
 
 
-    MoveShareResult moveToShare(String filePath, String destination, String folder, String msisdn);
+    MoveShareResult moveToShare(String filePath, String destination, String folder, String msisdn,String fileName);
     class MoveShareResult{
         private boolean success;
         private String finalPath;

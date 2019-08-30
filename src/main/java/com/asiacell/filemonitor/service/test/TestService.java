@@ -35,9 +35,9 @@ public class TestService {
 
     public void testAddBatchFile() {
         List<FileMoveItem>fileMoveItems= new ArrayList<>();
-        fileMoveItems.add( new FileMoveItem( new ProcessItem(  utilService.guid() , utilService.getHostname(),"","07701105526","07701105526_PH_1222.jpg",1, new Date()),1, new Date(),"demo/test/07701105526"));
-        fileMoveItems.add( new FileMoveItem( new ProcessItem(  utilService.guid() , utilService.getHostname(),"","07701105527","07701105527_PH_1222.jpg",0, new Date()),2, new Date(),"demo/test/07701105527"));
-        fileMoveItems.add( new FileMoveItem( new ProcessItem(  utilService.guid() , utilService.getHostname(),"","07701105528","07701105528_PH_1222.jpg",2, new Date()),3, new Date(),"demo/test/07701105527"));
+        fileMoveItems.add( new FileMoveItem( new ProcessItem(  utilService.guid() , utilService.getHostname(),"","07701105526","07701105526_PH_1222.jpg",1, new Date()),1, new Date(),"demo/test/07701105526", new Date(),new Date()));
+        fileMoveItems.add( new FileMoveItem( new ProcessItem(  utilService.guid() , utilService.getHostname(),"","07701105527","07701105527_PH_1222.jpg",0, new Date()),2, new Date(),"demo/test/07701105527", new Date(), new Date()));
+        fileMoveItems.add( new FileMoveItem( new ProcessItem(  utilService.guid() , utilService.getHostname(),"","07701105528","07701105528_PH_1222.jpg",2, new Date()),3, new Date(),"demo/test/07701105527", new Date(), new Date()));
         dataDaoService.addBatchFileItems( fileMoveItems );
     }
 
@@ -72,7 +72,7 @@ public class TestService {
 
     public  void testAddBatchFileItems(){
         ProcessItem processItem = new ProcessItem( "a7e8baa223d2489e842a0dca43dafb55", utilService.getHostname(),"","07701105526", "07701105526_test_111.jpg",1,new Date());
-        FileMoveItem fileMoveItem = new FileMoveItem(processItem,1,new Date(),"final_path");
+        FileMoveItem fileMoveItem = new FileMoveItem(processItem,1,new Date(),"final_path", new Date(), new Date());
         dataDaoService.addBatchFileItems(Arrays.asList( fileMoveItem));
     }
 }

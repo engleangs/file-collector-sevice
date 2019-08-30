@@ -31,25 +31,32 @@ public class FileHelperServiceImpl implements FileHelperService {
     }
 
     @Override
-    public MoveShareResult moveToShare(String filePath, String destination, String folder, String msisdn) {
+    public MoveShareResult moveToShare(String filePath, String destination, String folder, String msisdn,String fileName) {
         Path dest ;
-        LOGGER.debug("begin to move to share :"+filePath+", to "+destination +" folder :"+folder +" with :"+msisdn);if(folder !=null && !folder.isEmpty()) {
+        LOGGER.debug("begin to move to share :"+filePath+", to "+destination +" folder :"+folder +" with :"+msisdn);
+        if(folder !=null && !folder.isEmpty()) {
             dest  = Paths.get( destination,folder, utilService.pathOfMsisdn(msisdn));
         }
         else {
             dest = Paths.get( destination , utilService.pathOfMsisdn( msisdn));
+        }
+        File destFolder  = new File( dest.toString());
+        if( !destFolder.exists()) {
+            destFolder.mkdirs(); //for testing
         }
 
         File file = new File( filePath);
         if( !file.exists()) {
             new MoveShareResult(false,dest.toString(), "file_no_exist");
         }
-
-
-        LOGGER.debug("new path = "+dest.toString());
-
-        boolean rename = file.renameTo(new File( dest.toString()) );
-        return new MoveShareResult( rename, dest.toString(),"");
+        String newPath = dest.toString() +"/"+fileName;
+        LOGGER.debug("new path = "+ newPath);
+        boolean rename = file.renameTo(new File( newPath) );
+        MoveShareResult result = new MoveShareResult( rename, newPath,"");
+        if(!rename) {
+            result.setDescription( "exist_move_fail");
+        }
+        return result;
 
     }
 

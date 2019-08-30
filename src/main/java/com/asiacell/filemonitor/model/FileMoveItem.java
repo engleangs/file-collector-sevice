@@ -7,11 +7,15 @@ public class FileMoveItem {
     private int retryTime;
     private Date lastActionDate;
     private String finalPath;
-    public FileMoveItem(ProcessItem processItem, int retryTime, Date lastActionDate, String finalPath){
+    private Date start;
+    private Date finish;
+    public FileMoveItem(ProcessItem processItem, int retryTime, Date lastActionDate, String finalPath, Date start, Date finish){
         this.processItem  = processItem;
         this.retryTime = retryTime;
         this.lastActionDate  = lastActionDate;
         this.finalPath = finalPath;
+        this.start = start;
+        this.finish = finish;
     }
 
     public ProcessItem getProcessItem() {
@@ -44,5 +48,21 @@ public class FileMoveItem {
 
     public void setFinalPath(String finalPath) {
         this.finalPath = finalPath;
+    }
+
+    public Date getStart() {
+        return start;
+    }
+
+    public void setStart(Date start) {
+        this.start = start;
+    }
+
+    public Date getFinish() {
+        return finish;
+    }
+
+    public void setFinish(Date finish) {
+        this.finish = finish;
     }
 }

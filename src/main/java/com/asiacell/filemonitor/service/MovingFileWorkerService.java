@@ -7,5 +7,6 @@ public interface MovingFileWorkerService {
     void stop();
     void run();
     void track(FileMoveItem fileMoveItem);
+    boolean isRetryQueueAvailable();
 
 }
