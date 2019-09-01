@@ -76,8 +76,8 @@ public class DataDaoServiceImpl implements DataDaoService {
     @Override
     public int addBatchFileItems(List<FileMoveItem> fileMoveItems) {
         StringBuilder sqlBuilder = new StringBuilder(" INSERT INTO ").append(fileMoveTableName);
-        sqlBuilder.append("(guid,msisdn,temp_path,final_path,file_name,status,description,retry,added_date,last_action_date,action_hostname,start_date,finish_date,take)")
-                .append(" VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        sqlBuilder.append("(guid,msisdn,temp_path,final_path,file_name,status,description,retry,added_date,last_action_date,action_hostname,start_date,finish_date,take_time,ref_id)")
+                .append(" VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
         String query = sqlBuilder.toString();
         List<String> processItemGuid = new ArrayList<>();
         jdbcTemplate.batchUpdate(query, new BatchPreparedStatementSetter() {
@@ -86,7 +86,7 @@ public class DataDaoServiceImpl implements DataDaoService {
                 FileMoveItem item = fileMoveItems.get(i);
                 long take =   item.getFinish().getTime() - item.getStart().getTime();
                 processItemGuid.add("'" + item.getProcessItem().getGuid() + "'");
-                ps.setString(1, item.getProcessItem().getGuid());
+                ps.setString(1, utilService.guid());
                 ps.setString(2, item.getProcessItem().getMisisdn());
                 ps.setString(3, item.getProcessItem().getTempPath());
                 ps.setString(4, item.getFinalPath());
@@ -100,6 +100,7 @@ public class DataDaoServiceImpl implements DataDaoService {
                 ps.setTimestamp( 12, new Timestamp( item.getStart().getTime()));
                 ps.setTimestamp( 13, new Timestamp( item.getFinish().getTime()));
                 ps.setLong( 14, take);
+                ps.setString( 15, item.getProcessItem().getGuid());
             }
 
             @Override
@@ -171,7 +172,7 @@ public class DataDaoServiceImpl implements DataDaoService {
         sqlBuilder.append(fileServiceTable).append(" WHERE hostname=?");
         String query = sqlBuilder.toString();
         Map<String, Object> result = jdbcTemplate.queryForMap(query, utilService.getHostname());
-        long total = (long) result.get("total");
+        long total = Long.parseLong(result.get("total")+"");
         if (total == 0) {
             sqlBuilder = new StringBuilder(" INSERT INTO ");
             sqlBuilder.append(fileServiceTable).append("(hostname,last_update) VALUES(?,?)");

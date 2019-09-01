@@ -21,8 +21,6 @@ import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
-
-///todo:implement for starting after file watcher service or restart
 @Service
 public class FileShareFinalDirectoryServiceImpl implements FileShareFinalDirectoryService {
 
@@ -48,7 +46,9 @@ public class FileShareFinalDirectoryServiceImpl implements FileShareFinalDirecto
 
     @Override
     public void start() throws IOException {
-        LOGGER.info("start share final directory");
+        LOGGER.info(" start share final directory");
+        LOGGER.info(" monitor on directory : "+monitorDirectory);
+        LOGGER.info(" task directory : "+taskDirectory);
         watchService = FileSystems.getDefault().newWatchService();
         Path path = Paths.get( monitorDirectory);
         loadOldFile();

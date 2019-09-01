@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
@@ -31,32 +33,42 @@ public class FileHelperServiceImpl implements FileHelperService {
     }
 
     @Override
-    public MoveShareResult moveToShare(String filePath, String destination, String folder, String msisdn,String fileName) {
-        Path dest ;
-        LOGGER.debug("begin to move to share :"+filePath+", to "+destination +" folder :"+folder +" with :"+msisdn);
-        if(folder !=null && !folder.isEmpty()) {
-            dest  = Paths.get( destination,folder, utilService.pathOfMsisdn(msisdn));
+    public MoveShareResult moveToShare(String filePath, String destination, String folder, String msisdn,String fileName) throws FileAlreadyExistsException {
+            StringBuilder dest = new StringBuilder(destination);
+            LOGGER.info("begin to move to share :" + filePath + ", to " + destination + " folder :" + folder + " with :" + msisdn);
+            if (folder != null && !folder.isEmpty()) {
+                dest.append("/").append(folder);
+            }
+            dest.append("/").append(utilService.pathOfMsisdn(msisdn));
+            LOGGER.info("dest " + dest.toString());
+        try {
+                File destFolder = new File(dest.toString());
+                LOGGER.info("destination folder "+dest.toString());
+                if (!destFolder.exists()) {
+                    boolean dirMakeResult = destFolder.mkdirs(); //for testing
+                    LOGGER.info(" create new  directory result : "+dirMakeResult +" of "+dest.toString());
+                }
+
+                File file = new File(filePath);
+                if (!file.exists()) {
+                    new MoveShareResult(false, dest.toString(), "file_no_exist");
+                }
+                String newPath = dest.append("/").append( fileName).toString();
+                LOGGER.info("new path = " + newPath);
+                Files.copy(Paths.get(  filePath) , Paths.get( newPath));
+                boolean deleteResult = file.delete();
+                LOGGER.info("finish moving successfully & delete from local :"+deleteResult);
+
+                MoveShareResult result = new MoveShareResult(true, newPath, "");
+                return result;
+        }catch (FileAlreadyExistsException ex){
+            throw  ex;
         }
-        else {
-            dest = Paths.get( destination , utilService.pathOfMsisdn( msisdn));
-        }
-        File destFolder  = new File( dest.toString());
-        if( !destFolder.exists()) {
-            destFolder.mkdirs(); //for testing
+        catch (Exception ex){
+            LOGGER.error("error during move file ",ex);
+            return new MoveShareResult(false, dest.toString(), ex.getMessage());
         }
 
-        File file = new File( filePath);
-        if( !file.exists()) {
-            new MoveShareResult(false,dest.toString(), "file_no_exist");
-        }
-        String newPath = dest.toString() +"/"+fileName;
-        LOGGER.debug("new path = "+ newPath);
-        boolean rename = file.renameTo(new File( newPath) );
-        MoveShareResult result = new MoveShareResult( rename, newPath,"");
-        if(!rename) {
-            result.setDescription( "exist_move_fail");
-        }
-        return result;
 
     }
 

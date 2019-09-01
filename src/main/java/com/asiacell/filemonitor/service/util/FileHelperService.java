@@ -1,12 +1,13 @@
 package com.asiacell.filemonitor.service.util;
 
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 
 public interface FileHelperService {
-    boolean moveTobyDate(String fileName, Path source, Path dest);
+    boolean moveTobyDate(String fileName, Path source, Path dest) ;
 
 
-    MoveShareResult moveToShare(String filePath, String destination, String folder, String msisdn,String fileName);
+    MoveShareResult moveToShare(String filePath, String destination, String folder, String msisdn,String fileName)throws FileAlreadyExistsException;
     class MoveShareResult{
         private boolean success;
         private String finalPath;

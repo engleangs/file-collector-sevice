@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -22,7 +23,7 @@ public class MovingFileWorkerServiceImpl implements MovingFileWorkerService {
     @Value("${worker-number}")
     private int workerNumber;
     static final Logger LOGGER = LoggerFactory.getLogger( MovingFileWorkerService.class);
-    static final ConcurrentLinkedQueue<FileMoveItem>QUEUE = new ConcurrentLinkedQueue<>();
+    static final ConcurrentHashMap<String,FileMoveItem>QUEUE = new ConcurrentHashMap<>();
 
     @Autowired
     private DataDaoService dataDaoService;
@@ -43,11 +44,11 @@ public class MovingFileWorkerServiceImpl implements MovingFileWorkerService {
     private int maxSizeRetryQueue;
     @Autowired
     private UtilService utilService ;
-
     private long startTrackDb = System.currentTimeMillis();
     private Set<String> hostOfServices;
     private  FileMoveTask.FileMoveConfig fileMoveConfig;
     private ConcurrentHashMap<String,ProcessItem>processingQueue =  new ConcurrentHashMap<>();
+    private  ConcurrentHashMap<String,ProcessItem>retryQueue = new ConcurrentHashMap<>();
 
     @Override
     public void start() {
@@ -67,12 +68,32 @@ public class MovingFileWorkerServiceImpl implements MovingFileWorkerService {
         retryThread = new Thread(this::monitorRetry);
         retryThread.start();
         LOGGER.info("Starting file worker success  ");
+        LOGGER.info(" Temp directory  : "+basePath);
+        LOGGER.info(" Final directory :"+destination);
+        LOGGER.info(" File worker thread :"+workerNumber);
         LOGGER.info(" MAX RETRY QUEUE : "+maxSizeRetryQueue);
     }
 
     @Override
     public void stop() {
+        running = false;
         threadPoolExecutor.shutdown();
+        try{
+            Thread.sleep(100);
+            if(retryThread.isAlive()) {
+                retryThread.interrupt();
+            }
+            if( trackingThread.isAlive()) {
+                trackingThread.interrupt();
+            }
+            if(checkingThread.isAlive()) {
+                checkingThread.interrupt();
+            }
+        }catch (Exception ex){
+
+        }
+
+
     }
 
     public boolean  fileNotExist(ProcessItem processItem) {
@@ -104,49 +125,69 @@ public class MovingFileWorkerServiceImpl implements MovingFileWorkerService {
 
     }
 
+    Set<String>filterGuiId(){
+        Set<String>hashSet = new HashSet<>();
+        hashSet.addAll( processingQueue.keySet());
+        hashSet.addAll( QUEUE.keySet());
+        hashSet.addAll( retryQueue.keySet());
+        return hashSet;
+
+    }
+
     @Override
     public void run() {
         while ( running ) {
 
             if( counter > 100) {
-                LOGGER.info("processing queue for moving file:"+processingQueue.size());
+                LOGGER.info("processing queue for moving file:"+processingQueue.size() +", retry queue :"+retryQueue.size() +", db queue :"+QUEUE.size());
                 counter = 0;
             }
-            List<ProcessItem> items = dataDaoService.getListItem(  processingQueue.keySet());
-            LOGGER.info(" size of processing  item : "+items.size());
-            if( items.size() > 0) {
-                for(ProcessItem item : items )
-                {
-                    if( item.getFileName() == null) {
-                        item.setDescription("invalid file name");
-                        item.setStatus(0);
-                        FileMoveItem fileMoveItem = new FileMoveItem( item, 0,new Date(),"", new Date(), new Date());
-                        track( fileMoveItem);
-                        LOGGER.info("invalid file name");
-                        continue;
-                    }
-                    if( processingQueue.containsKey( item.getGuid())) {
-                        LOGGER.info(" Retry queue : "+ processingQueue.size());
-                        LOGGER.info(" "+item.getFileName()+" in the queue already");
-                        continue;
-                    }
-                    LOGGER.info("begin to execute moving task :"+item.getFileName());
-                    if( fileNotExist( item)) {
-                        checkIfAllNotFoundAndMoveOut( item);
-                    }
-                    else {
-                        LOGGER.info("begin to process for : "+item.getGuid());
-                        item.setStartMoveFileDate( new Date());
-                        threadPoolExecutor.execute( new FileMoveTask( utilService, this.fileMoveConfig, fileHelperService, item,this));
-                        processingQueue.put( item.getGuid(), item);
+            try {
+                List<ProcessItem> items = dataDaoService.getListItem( filterGuiId());
+                LOGGER.info(" size of processing  item : " + items.size() +", retry queue :"+retryQueue.size() +", db queue :"+QUEUE.size());
+                if (items.size() > 0) {
+                    for (ProcessItem item : items) {
+                        if (item.getFileName() == null) {
+                            item.setDescription("invalid file name");
+                            item.setStatus(0);
+                            FileMoveItem fileMoveItem = new FileMoveItem(item, 0, new Date(), "", new Date(), new Date());
+                            track(fileMoveItem);
+                            LOGGER.info("invalid file name");
+                            continue;
+                        }
+                        if (processingQueue.containsKey(item.getGuid())) {
+                            LOGGER.info(" processing queue : " + processingQueue.size());
+                            LOGGER.info(" " + item.getFileName() + " in the queue already");
+                            continue;
+                        }
+                        if( retryQueue.containsKey( item.getGuid())) {
+                            LOGGER.info(" retry queue : "+retryQueue.size());
+                            LOGGER.info(" " + item.getFileName() + " in the retry-queue already");
+                            continue;
+                        }
+                        LOGGER.info("begin to execute moving task :" + item.getFileName());
+                        if (fileNotExist(item)) {
+                            checkIfAllNotFoundAndMoveOut(item);
+                        } else {
+                            LOGGER.info("begin to process for : " + item.getGuid());
+                            item.setStartMoveFileDate(new Date());
+                            threadPoolExecutor.execute(new FileMoveTask(utilService, this.fileMoveConfig, fileHelperService, item, this));
+                            processingQueue.put(item.getGuid(), item);
+                        }
                     }
                 }
-            }
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {
-                LOGGER.debug("error on run ", e);
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    LOGGER.debug("error on run ", e);
 
+                }
+            }catch (CannotGetJdbcConnectionException ex){
+                LOGGER.error("db closed ",ex);
+                return;
+            }
+            catch (Exception ex){
+                LOGGER.error("error",ex);
             }
             counter++;
         }
@@ -158,23 +199,37 @@ public class MovingFileWorkerServiceImpl implements MovingFileWorkerService {
     }
     private void addToDb(){
         List<FileMoveItem>items = new ArrayList<>();
-        FileMoveItem item;
-        while ((item = QUEUE.poll())!= null) {
-            items.add( item );
+        for(String key : QUEUE.keySet()) {
+
+            FileMoveItem fileMoveItem =    QUEUE.get(key);
+            items.add( fileMoveItem);
         }
+
         if( items.size() > 0 ) {
             LOGGER.info("begin to add to db :"+items.size());
             dataDaoService.addBatchFileItems( items);
             LOGGER.info("finish batch add to db :"+items.size());
         }
+        for(FileMoveItem item : items) {
+            QUEUE.remove( item.getProcessItem().getGuid());//remove it out
+            LOGGER.info("clean from db queue :"+item.getProcessItem().getGuid());
+        }
     }
 
     @Override
     public void track(FileMoveItem fileMoveItem) {
-        QUEUE.add( fileMoveItem);
+        QUEUE.put( fileMoveItem.getProcessItem().getGuid(), fileMoveItem);
          ProcessItem item =  processingQueue.remove( fileMoveItem.getProcessItem().getGuid());
-        LOGGER.info(" finish for this item : "+item.getGuid() +" ->"+fileMoveItem.getProcessItem().getFileName() ) ;
+         retryQueue.remove( fileMoveItem.getProcessItem().getGuid());
+         if( item != null) {
+             LOGGER.info(" finish for this item : "+item.getGuid() +" ->"+fileMoveItem.getProcessItem().getFileName() ) ;
+         }
+
         LOGGER.info(" remaining in db queue : "+QUEUE.size() +" , retry queue "+ processingQueue.size());
+        if(QUEUE.size() > 100) {
+            addToDb();
+        }
+
 
     }
 
@@ -182,6 +237,7 @@ public class MovingFileWorkerServiceImpl implements MovingFileWorkerService {
     {
         while (this.running) {
 
+            LOGGER.info(" Tracking db -> should add to db  for queue : "+shouldAddToDb());
             if( shouldAddToDb()) {
                 addToDb();
                 this.startTrackDb = System.currentTimeMillis();
@@ -202,19 +258,35 @@ public class MovingFileWorkerServiceImpl implements MovingFileWorkerService {
         return processingQueue.size() < this.maxSizeRetryQueue;
     }
 
+    @Override
+    public void putInretry(ProcessItem processItem) {
+        processingQueue.remove( processItem.getGuid());
+        LOGGER.info("put in retry : "+processItem.getGuid()+"->"+processItem.getFileName());
+        retryQueue.put( processItem.getGuid(), processItem);
+    }
+
 
     public void monitorRetry() {
             while (running) {
                 try {
-                    for(String key : processingQueue.keySet())
+                    for(String key : retryQueue.keySet())
                     {
-                        ProcessItem processItem = processingQueue.get( key);
+                        ProcessItem processItem = retryQueue.get( key);
+                        if( processItem == null) {
+                            LOGGER.info("not found ");
+                            continue;
+                        }
+                        if( processItem.isRunning()) {
+                            LOGGER.info(" it's running for this : "+processItem.getGuid());
+                            continue;
+                        }
                         if (processItem.getExpectedRunDate().getTime() <= System.currentTimeMillis()) {
                             LOGGER.info("retry now for this : " + processItem.getGuid() + ", " + processItem.getFileName() +" for : "+processItem.getRetryTime() +" times");
                             threadPoolExecutor.execute(new FileMoveTask(utilService, this.fileMoveConfig, fileHelperService, processItem, this));
+                            processingQueue.put( processItem.getGuid(), processItem);//add back to processing queue
                         }
                     }
-                    LOGGER.info(" retry for items :"+processingQueue.size());
+                    LOGGER.info(" total retry items :"+retryQueue.size());
 
                 }catch (NoSuchElementException ex){
                     //ignore this

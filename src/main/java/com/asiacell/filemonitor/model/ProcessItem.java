@@ -17,6 +17,7 @@ public class ProcessItem {
     private int retryTime  = 0;
     private Date startMoveFileDate;
     private Date expectedRunDate;
+    private boolean running  = false;
     public ProcessItem(){
 
     }
@@ -31,6 +32,15 @@ public class ProcessItem {
         this.status = status;
         this.addDate = addDate;
         this.guid = guid;
+        this.expectedRunDate  = new Date();
+    }
+
+    public void setRunning(boolean running) {
+        this.running = running;
+    }
+
+    public boolean isRunning() {
+        return running;
     }
 
     public void setDescription(String description) {

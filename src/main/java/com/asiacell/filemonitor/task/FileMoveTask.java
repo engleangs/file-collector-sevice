@@ -8,6 +8,7 @@ import com.asiacell.filemonitor.service.util.UtilService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.FileAlreadyExistsException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -27,6 +28,7 @@ public class FileMoveTask implements Runnable {
         this.movingFileWorkerService = movingFileWorkerService;
         this.config = config;
         this.utilService = utilService;
+        processItem.setRunning( true);
     }
 
     @Override
@@ -36,9 +38,13 @@ public class FileMoveTask implements Runnable {
         LOGGER.info("begin to move from : "+tempPath +" to : "+ config.destination);
         processItem.setTempPath( tempPath );
         try {
-            result = fileHelperService.moveToShare( tempPath, processItem.getFolder(), config.destination, processItem.getMisisdn() , processItem.getFileName());
-        }catch (Exception ex){
-            processItem.setDescription( ex.getMessage());
+            result = fileHelperService.moveToShare( tempPath,config.destination,  processItem.getFolder(), processItem.getMisisdn() , processItem.getFileName());
+        }catch (FileAlreadyExistsException ex){
+            LOGGER.error("error file already exist");
+            processItem.setDescription( "error:"+ ex.getMessage());
+            LOGGER.info(" move out this file from queue "+processItem.getFileName());
+            movingFileWorkerService.track( new FileMoveItem(processItem, processItem.getRetryTime() , new Date(), "NA", processItem.getStartMoveFileDate(), new Date()));
+            return;
         }
         processItem.setDescription( result.getDescription());
             if (result.isSuccess()|| ( !result.isSuccess()
@@ -57,8 +63,11 @@ public class FileMoveTask implements Runnable {
                 processItem.retry();//keep retry
                 SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-                LOGGER.info( " -> sleep time "+ retry +" second and retry for "+processItem.getGuid()+","+processItem.getFileName() );
-                LOGGER.info("  -> now " + simpleDateFormat.format( new Date()) +" to execute at "+simpleDateFormat.format( calendar.getTime()) );
+                LOGGER.info( " retry-> sleep time "+ retry +" second and retry for "+processItem.getGuid()+","+processItem.getFileName() );
+                LOGGER.info("  retry-> now " + simpleDateFormat.format( new Date()) +" to execute at "+simpleDateFormat.format( calendar.getTime()) );
+                processItem.setRunning( false);
+                movingFileWorkerService.putInretry( processItem);//come back to retry
+
             }
 
 
